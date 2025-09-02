@@ -225,6 +225,24 @@ export const NumberPlateRecognition = () => {
     toast({ title: 'Report generated', description: `${plateResult.plateNumber} report downloaded.` });
   }
 
+  function createSamplePlate(text: string) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640; canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 100px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    return canvas.toDataURL('image/png');
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
