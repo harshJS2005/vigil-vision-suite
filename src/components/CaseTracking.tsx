@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Search, FileText, Clock, User, AlertCircle, CheckCircle, Eye } from 'lucide-react';
-import { mockCases } from '@/data/mockData';
+import { useSecurityStore } from '@/store/securityStore';
 import { Case } from '@/types';
 
 export const CaseTracking = () => {

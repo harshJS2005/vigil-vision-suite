@@ -8,16 +8,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Shield, Eye, Camera, FileText, Lock, Zap } from 'lucide-react';
 import heroImage from '@/assets/hero-security.jpg';
+import { useSecurityStore } from '@/store/securityStore';
 
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const addCase = useSecurityStore((s) => s.addCase);
   const [password, setPassword] = useState('');
   const [caseForm, setCaseForm] = useState({
     title: '',
     description: '',
     reportedBy: '',
-    priority: 'medium'
+    priority: 'medium' as const
   });
 
   const handleDashboardAccess = () => {
@@ -25,9 +27,9 @@ const Index = () => {
       navigate('/dashboard');
     } else {
       toast({
-        title: "Access Denied",
-        description: "Invalid password. Please try again.",
-        variant: "destructive",
+        title: 'Access Denied',
+        description: 'Invalid password. Please try again.',
+        variant: 'destructive',
       });
     }
   };
@@ -35,25 +37,27 @@ const Index = () => {
   const handleCaseSubmission = () => {
     if (!caseForm.title || !caseForm.description || !caseForm.reportedBy) {
       toast({
-        title: "Missing Information",
-        description: "Please fill in all required fields.",
-        variant: "destructive",
+        title: 'Missing Information',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
       });
       return;
     }
 
-    toast({
-      title: "Case Filed Successfully",
-      description: "Your case has been submitted to the tracking system.",
-      variant: "default",
+    const created = addCase({
+      title: caseForm.title,
+      description: caseForm.description,
+      reportedBy: caseForm.reportedBy,
+      priority: caseForm.priority,
     });
 
-    setCaseForm({
-      title: '',
-      description: '',
-      reportedBy: '',
-      priority: 'medium'
+    toast({
+      title: 'Case Filed Successfully',
+      description: `Case ${created.id} has been added to tracking.`,
+      variant: 'default',
     });
+
+    setCaseForm({ title: '', description: '', reportedBy: '', priority: 'medium' });
   };
 
   return (
@@ -73,8 +77,9 @@ const Index = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-40"
+                aria-label="Dashboard password"
               />
-              <Button variant="hero" onClick={handleDashboardAccess}>
+              <Button variant="hero" onClick={handleDashboardAccess} aria-label="Access dashboard">
                 <Lock className="w-4 h-4" />
                 Access Dashboard
               </Button>
@@ -86,14 +91,14 @@ const Index = () => {
       {/* Hero Section */}
       <section className="relative py-20 overflow-hidden">
         <div className="absolute inset-0">
-          <img 
-            src={heroImage} 
-            alt="AI Security System" 
+          <img
+            src={heroImage}
+            alt="AI Security System"
             className="w-full h-full object-cover opacity-30"
           />
           <div className="absolute inset-0 bg-gradient-hero/80"></div>
         </div>
-        
+
         <div className="relative container mx-auto px-4 text-center">
           <h2 className="text-5xl font-bold text-foreground mb-6">
             Advanced AI Security
@@ -102,7 +107,7 @@ const Index = () => {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Powered by cutting-edge AI technology for face recognition, number plate detection, 
+            Powered by cutting-edge AI technology for face recognition, number plate detection,
             and comprehensive security management.
           </p>
           <div className="flex justify-center gap-4">
@@ -174,7 +179,7 @@ const Index = () => {
                   <Input
                     id="caseTitle"
                     value={caseForm.title}
-                    onChange={(e) => setCaseForm({...caseForm, title: e.target.value})}
+                    onChange={(e) => setCaseForm({ ...caseForm, title: e.target.value })}
                     placeholder="Enter case title"
                   />
                 </div>
@@ -183,7 +188,7 @@ const Index = () => {
                   <Textarea
                     id="caseDescription"
                     value={caseForm.description}
-                    onChange={(e) => setCaseForm({...caseForm, description: e.target.value})}
+                    onChange={(e) => setCaseForm({ ...caseForm, description: e.target.value })}
                     placeholder="Describe the incident in detail"
                     rows={4}
                   />
@@ -193,7 +198,7 @@ const Index = () => {
                   <Input
                     id="reportedBy"
                     value={caseForm.reportedBy}
-                    onChange={(e) => setCaseForm({...caseForm, reportedBy: e.target.value})}
+                    onChange={(e) => setCaseForm({ ...caseForm, reportedBy: e.target.value })}
                     placeholder="Your name or organization"
                   />
                 </div>
@@ -202,8 +207,8 @@ const Index = () => {
                   <select
                     id="priority"
                     value={caseForm.priority}
-                    onChange={(e) => setCaseForm({...caseForm, priority: e.target.value})}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    onChange={(e) => setCaseForm({ ...caseForm, priority: e.target.value as any })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
@@ -211,10 +216,10 @@ const Index = () => {
                     <option value="critical">Critical</option>
                   </select>
                 </div>
-                <Button 
-                  variant="hero" 
-                  size="lg" 
-                  className="w-full" 
+                <Button
+                  variant="hero"
+                  size="lg"
+                  className="w-full"
                   onClick={handleCaseSubmission}
                 >
                   <FileText className="w-4 h-4" />
