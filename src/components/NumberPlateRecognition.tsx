@@ -342,14 +342,14 @@ export const NumberPlateRecognition = () => {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => generatePlateReport()}>
                   Generate Report
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => toast({ title: 'Added to watchlist', description: `${plateResult.plateNumber} added to watchlist.` })}>
                   Add to Watchlist
                 </Button>
                 {plateResult.flagged && (
-                  <Button variant="destructive">
+                  <Button variant="destructive" onClick={() => toast({ title: 'Authorities alerted', description: `Dispatched alert for ${plateResult.plateNumber}.` })}>
                     Alert Authorities
                   </Button>
                 )}
