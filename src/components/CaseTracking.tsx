@@ -302,6 +302,70 @@ export const CaseTracking = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Details Dialog */}
+      <Dialog open={!!detailsCase} onOpenChange={(open) => !open && setDetailsCase(null)}>
+        <DialogContent>
+          {detailsCase && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Case {detailsCase.id} – {detailsCase.title}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{detailsCase.description}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Reported By</p>
+                  <p className="font-medium">{detailsCase.reportedBy}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Reported Date</p>
+                  <p className="font-medium">{detailsCase.reportedDate}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{detailsCase.status}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Priority</p>
+                  <p className="font-medium capitalize">{detailsCase.priority}</p>
+                </div>
+              </div>
+              {detailsCase.evidence.length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Evidence</p>
+                  <div className="flex flex-wrap gap-2">
+                    {detailsCase.evidence.map((e, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">{e}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Evidence Dialog */}
+      <Dialog open={!!evidenceCase} onOpenChange={(open) => !open && setEvidenceCase(null)}>
+        <DialogContent>
+          {evidenceCase && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Add Evidence to {evidenceCase.id}</DialogTitle>
+              </DialogHeader>
+              <Input
+                placeholder="e.g. CCTV clip ID 12345"
+                value={evidenceInput}
+                onChange={(e) => setEvidenceInput(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEvidenceCase(null)}>Cancel</Button>
+                <Button onClick={() => handleAddEvidence()} disabled={!evidenceInput.trim()}>Add</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
