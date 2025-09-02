@@ -54,22 +54,37 @@ export const NumberPlateRecognition = () => {
       let confidence = 0;
 
       if (!detectedPlate && uploadedImage) {
-        const { data } = await Tesseract.recognize(uploadedImage, 'eng', {
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ',
-        } as any);
-        const rawText = (data.text || '').toUpperCase().replace(/\n+/g, ' ');
-        const candidates = extractPlateCandidates(rawText);
-
-        if (candidates.length) {
-          detectedPlate = candidates[0];
-          // estimate confidence from word confidences
-          const words = (data.words || []) as Array<{ text: string; confidence: number }>;
-          const parts = detectedPlate.split(/[- ]/).filter(Boolean);
-          const matched = words.filter(w => parts.some(p => w.text?.toUpperCase().includes(p)));
-          const avg = matched.length ? Math.round(matched.reduce((s, w) => s + (w.confidence || 0), 0) / matched.length) : Math.round(data.confidence || 80);
-          confidence = Math.min(100, Math.max(50, avg));
+        const variants = await generatePreprocessedVariants(uploadedImage);
+        const passes = [
+          { psm: '7', note: 'single-line' },
+          { psm: '6', note: 'block' },
+        ];
+        const results: Array<{ plate: string; conf: number }> = [];
+        for (const src of variants) {
+          for (const pass of passes) {
+            const { data } = await Tesseract.recognize(src, 'eng', {
+              tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ',
+              tessedit_pageseg_mode: pass.psm,
+              preserve_interword_spaces: '1',
+            } as any);
+            const rawText = (data.text || '').toUpperCase().replace(/\n+/g, ' ');
+            const cands = extractPlateCandidates(rawText);
+            if (cands.length) {
+              const plate = normalizePlate(cands[0]);
+              const words = (data.words || []) as Array<{ text: string; confidence: number }>;
+              const parts = plate.split(/[- ]/).filter(Boolean);
+              const matched = words.filter(w => parts.some(p => w.text?.toUpperCase().includes(p)));
+              const avg = matched.length ? Math.round(matched.reduce((s, w) => s + (w.confidence || 0), 0) / matched.length) : Math.round(data.confidence || 80);
+              const conf = Math.min(100, Math.max(50, avg));
+              results.push({ plate, conf });
+            }
+          }
+        }
+        if (results.length) {
+          results.sort((a, b) => b.conf - a.conf);
+          detectedPlate = results[0].plate;
+          confidence = results[0].conf;
         } else {
-          // fallback if OCR fails
           detectedPlate = generateRandomPlate();
           confidence = 60;
         }
