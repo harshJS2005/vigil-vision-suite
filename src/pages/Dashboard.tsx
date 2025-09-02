@@ -10,7 +10,7 @@ import { CaseTracking } from '@/components/CaseTracking';
 import { IPBlocking } from '@/components/IPBlocking';
 import { Shield, Eye, Camera, FileText, Ban, BarChart3, Users, Activity } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { mockCases, mockCriminals, mockBlockedIPs } from '@/data/mockData';
+import { useSecurityStore } from '@/store/securityStore';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
