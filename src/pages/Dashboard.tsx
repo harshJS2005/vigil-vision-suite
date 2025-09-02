@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/enhanced-button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -9,15 +9,41 @@ import { CriminalDatabase } from '@/components/CriminalDatabase';
 import { CaseTracking } from '@/components/CaseTracking';
 import { IPBlocking } from '@/components/IPBlocking';
 import { Shield, Eye, Camera, FileText, Ban, BarChart3, Users, Activity } from 'lucide-react';
-import { mockCases, mockCriminals, mockBlockedIPs } from '@/data/mockData';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { useSecurityStore } from '@/store/securityStore';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [liveOpen, setLiveOpen] = useState(false);
+  const [events, setEvents] = useState<{ id: number; type: string; message: string; ts: string }[]>([]);
+
+  const storeCriminals = useSecurityStore((s) => s.criminals);
+  const storeCases = useSecurityStore((s) => s.cases);
+  const storeIPs = useSecurityStore((s) => s.blockedIPs);
+
+  useEffect(() => {
+    if (!liveOpen) return;
+    let id = 0;
+    const types = ['success', 'warning', 'primary'];
+    const pool = [
+      'Camera #2 detected plate',
+      'Face match confidence 92% for CR002',
+      'New case filed via public portal',
+      'Firewall blocked suspicious IP',
+      'Patrol car 7 check-in',
+    ];
+    const t = setInterval(() => {
+      const msg = pool[Math.floor(Math.random() * pool.length)];
+      const type = types[Math.floor(Math.random() * types.length)];
+      setEvents((prev) => [{ id: ++id, type, message: msg, ts: new Date().toLocaleTimeString() }, ...prev].slice(0, 50));
+    }, 2000);
+    return () => clearInterval(t);
+  }, [liveOpen]);
 
   const stats = {
-    totalCriminals: mockCriminals.length,
-    activeCases: mockCases.filter(c => c.status !== 'closed').length,
-    blockedIPs: mockBlockedIPs.filter(ip => ip.status === 'active').length,
+    totalCriminals: storeCriminals.length,
+    activeCases: storeCases.filter(c => c.status !== 'closed').length,
+    blockedIPs: storeIPs.filter(ip => ip.status === 'active').length,
     recognitionMatches: 47
   };
 
@@ -38,7 +64,7 @@ const Dashboard = () => {
               <Badge variant="outline" className="bg-success/10 text-success border-success/20">
                 System Online
               </Badge>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => setLiveOpen(true)}>
                 <Activity className="w-4 h-4" />
                 Live Monitor
               </Button>
@@ -196,6 +222,26 @@ const Dashboard = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Sheet open={liveOpen} onOpenChange={setLiveOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>Live Monitor</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4 space-y-2 max-h-[80vh] overflow-y-auto">
+            {events.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Waiting for live events…</p>
+            ) : (
+              events.map((e) => (
+                <div key={e.id} className={`flex items-center justify-between rounded border p-2 ${e.type === 'success' ? 'bg-success/10 border-success/20' : e.type === 'warning' ? 'bg-warning/10 border-warning/20' : 'bg-primary/10 border-primary/20'}`}>
+                  <span className="text-sm">{e.message}</span>
+                  <span className="text-xs text-muted-foreground">{e.ts}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

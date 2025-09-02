@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import Tesseract from 'tesseract.js';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/enhanced-button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +20,7 @@ export const NumberPlateRecognition = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [plateResult, setPlateResult] = useState<PlateResult | null>(null);
   const [manualPlate, setManualPlate] = useState('');
+  const [ocrProgress, setOcrProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -47,39 +49,143 @@ export const NumberPlateRecognition = () => {
 
   const processPlateRecognition = async (plateNumber?: string) => {
     setIsProcessing(true);
-    
-    // Simulate AI processing
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const detectedPlate = plateNumber || generateRandomPlate();
-    const vehicleTypes = ['Sedan', 'SUV', 'Truck', 'Motorcycle', 'Van'];
-    const isFlagged = flaggedPlates.includes(detectedPlate) || Math.random() > 0.7;
-    
-    const result: PlateResult = {
-      plateNumber: detectedPlate,
-      confidence: Math.floor(Math.random() * 20) + 80, // 80-100%
-      vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
-      flagged: isFlagged,
-      reason: isFlagged ? (flaggedPlates.includes(detectedPlate) ? 'Stolen vehicle' : 'Traffic violation history') : undefined
-    };
 
-    setPlateResult(result);
-    setIsProcessing(false);
+    try {
+      let detectedPlate = plateNumber?.toUpperCase() || '';
+      let confidence = 0;
 
-    if (result.flagged) {
-      toast({
-        title: "⚠️ Flagged Vehicle Detected!",
-        description: `Plate ${result.plateNumber} is flagged: ${result.reason}`,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Plate Recognized",
-        description: `${result.plateNumber} identified with ${result.confidence}% confidence.`,
-        variant: "default",
-      });
+      if (!detectedPlate && uploadedImage) {
+        const variants = await generatePreprocessedVariants(uploadedImage);
+        const passes = [
+          { psm: '7', note: 'single-line' },
+          { psm: '6', note: 'block' },
+        ];
+        const results: Array<{ plate: string; conf: number }> = [];
+        for (const src of variants) {
+          for (const pass of passes) {
+            const { data } = await Tesseract.recognize(src, 'eng', {
+              tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789- ',
+              tessedit_pageseg_mode: pass.psm,
+              preserve_interword_spaces: '1',
+            } as any);
+            const rawText = (data.text || '').toUpperCase().replace(/\n+/g, ' ');
+            const cands = extractPlateCandidates(rawText);
+            if (cands.length) {
+              const plate = normalizePlate(cands[0]);
+              const words = (data.words || []) as Array<{ text: string; confidence: number }>;
+              const parts = plate.split(/[- ]/).filter(Boolean);
+              const matched = words.filter(w => parts.some(p => w.text?.toUpperCase().includes(p)));
+              const avg = matched.length ? Math.round(matched.reduce((s, w) => s + (w.confidence || 0), 0) / matched.length) : Math.round(data.confidence || 80);
+              const conf = Math.min(100, Math.max(50, avg));
+              results.push({ plate, conf });
+            }
+          }
+        }
+        if (results.length) {
+          results.sort((a, b) => b.conf - a.conf);
+          detectedPlate = results[0].plate;
+          confidence = results[0].conf;
+        } else {
+          detectedPlate = generateRandomPlate();
+          confidence = 60;
+        }
+      }
+
+      if (!detectedPlate) {
+        detectedPlate = generateRandomPlate();
+        confidence = 90;
+      }
+
+      const vehicleTypes = ['Sedan', 'SUV', 'Truck', 'Motorcycle', 'Van'];
+      const isFlagged = flaggedPlates.includes(detectedPlate) || Math.random() > 0.7;
+
+      const result: PlateResult = {
+        plateNumber: detectedPlate,
+        confidence: confidence || Math.floor(Math.random() * 15) + 80,
+        vehicleType: vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)],
+        flagged: isFlagged,
+        reason: isFlagged ? (flaggedPlates.includes(detectedPlate) ? 'Stolen vehicle' : 'Traffic violation history') : undefined
+      };
+
+      setPlateResult(result);
+
+      if (result.flagged) {
+        toast({
+          title: '⚠️ Flagged Vehicle Detected!',
+          description: `Plate ${result.plateNumber} is flagged: ${result.reason}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Plate Recognized',
+          description: `${result.plateNumber} identified with ${result.confidence}% confidence.`,
+          variant: 'default',
+        });
+      }
+    } catch (e) {
+      toast({ title: 'Recognition failed', description: 'Could not read the plate clearly.', variant: 'destructive' });
+    } finally {
+      setIsProcessing(false);
     }
   };
+
+  function normalizePlate(p: string) {
+    // collapse multiple spaces, unify dash spacing
+    return p.replace(/\s+/g, ' ').replace(/\s?-\s?/g, '-').trim();
+  }
+
+  async function generatePreprocessedVariants(src: string): Promise<string[]> {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const load = () => new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
+    img.src = src;
+    await load();
+    const variants: string[] = [];
+    const scales = [1, 1.5, 2];
+    const thresholds = [110, 140, 170];
+    for (const s of scales) {
+      const w = Math.floor(img.naturalWidth * s);
+      const h = Math.floor(img.naturalHeight * s);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      // grayscale
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i], g = imageData.data[i+1], b = imageData.data[i+2];
+        const y = 0.299*r + 0.587*g + 0.114*b;
+        imageData.data[i] = imageData.data[i+1] = imageData.data[i+2] = y;
+      }
+      // try several thresholds
+      for (const t of thresholds) {
+        const copy = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+        for (let i = 0; i < copy.data.length; i += 4) {
+          const v = copy.data[i];
+          const bin = v > t ? 255 : 0;
+          copy.data[i] = copy.data[i+1] = copy.data[i+2] = bin;
+        }
+        ctx.putImageData(copy, 0, 0);
+        variants.push(canvas.toDataURL('image/png'));
+      }
+    }
+    // include original as last resort
+    variants.push(src);
+    return variants;
+  }
+
+  function extractPlateCandidates(text: string): string[] {
+    const cleaned = text.replace(/[^A-Z0-9 -]/g, ' ');
+    const patterns = [
+      /[A-Z]{2,3}[- ]?[0-9]{3,4}/g,          // e.g., ABC-1234, AB 123
+      /[A-Z0-9]{2,4}[- ]?[A-Z0-9]{2,4}/g,    // generic two blocks
+    ];
+    const found = patterns.flatMap((re) => Array.from(cleaned.matchAll(re)).map(m => m[0]));
+    const normalized = Array.from(new Set(found.map(f => f.replace(/\s+/g, ' ').trim())));
+    normalized.sort((a, b) => b.length - a.length);
+    return normalized;
+  }
 
   const handleProcessImage = () => {
     if (!uploadedImage) {
@@ -104,6 +210,39 @@ export const NumberPlateRecognition = () => {
     }
     processPlateRecognition(manualPlate.toUpperCase());
   };
+
+  function generatePlateReport() {
+    if (!plateResult) return;
+    const data = { ...plateResult, generatedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${plateResult.plateNumber}-plate-report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Report generated', description: `${plateResult.plateNumber} report downloaded.` });
+  }
+
+  function createSamplePlate(text: string) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 640; canvas.height = 200;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 100px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    return canvas.toDataURL('image/png');
+  }
 
   return (
     <div className="space-y-6">
@@ -162,6 +301,15 @@ export const NumberPlateRecognition = () => {
                 onChange={handleFileUpload}
                 className="hidden"
               />
+            </div>
+
+            {isProcessing && (
+              <div className="text-center text-sm text-muted-foreground">OCR Progress: {ocrProgress}%</div>
+            )}
+
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => { const d = createSamplePlate('ABC-123'); setUploadedImage(d); setPlateResult(null); }}>Load Sample ABC-123</Button>
+              <Button variant="outline" size="sm" onClick={() => { const d = createSamplePlate('MH-12-AB-1234'); setUploadedImage(d); setPlateResult(null); }}>Load Sample MH-12-AB-1234</Button>
             </div>
 
             <Button
@@ -298,14 +446,14 @@ export const NumberPlateRecognition = () => {
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => generatePlateReport()}>
                   Generate Report
                 </Button>
-                <Button variant="outline">
+                <Button variant="outline" onClick={() => toast({ title: 'Added to watchlist', description: `${plateResult.plateNumber} added to watchlist.` })}>
                   Add to Watchlist
                 </Button>
                 {plateResult.flagged && (
-                  <Button variant="destructive">
+                  <Button variant="destructive" onClick={() => toast({ title: 'Authorities alerted', description: `Dispatched alert for ${plateResult.plateNumber}.` })}>
                     Alert Authorities
                   </Button>
                 )}

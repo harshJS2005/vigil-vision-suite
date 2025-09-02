@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/enhanced-button';
 import { Input } from '@/components/ui/input';
@@ -7,24 +7,31 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, FileText, Clock, User, AlertCircle, CheckCircle, Eye } from 'lucide-react';
 import { useSecurityStore } from '@/store/securityStore';
 import { Case } from '@/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export const CaseTracking = () => {
-  const [cases, setCases] = useState<Case[]>(mockCases);
+  const cases = useSecurityStore((s) => s.cases);
+  const updateCaseStatus = useSecurityStore((s) => s.updateCaseStatus);
+  const addEvidenceToCase = useSecurityStore((s) => s.addEvidenceToCase);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
+  const [detailsCase, setDetailsCase] = useState<Case | null>(null);
+  const [evidenceCase, setEvidenceCase] = useState<Case | null>(null);
+  const [evidenceInput, setEvidenceInput] = useState('');
   const { toast } = useToast();
 
-  const filteredCases = cases.filter(case_ => {
+  const filteredCases = useMemo(() => cases.filter(case_ => {
     const matchesSearch = case_.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          case_.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          case_.reportedBy.toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || case_.status === statusFilter;
     const matchesPriority = priorityFilter === 'all' || case_.priority === priorityFilter;
-    
+
     return matchesSearch && matchesStatus && matchesPriority;
-  });
+  }), [cases, searchQuery, statusFilter, priorityFilter]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -55,18 +62,39 @@ export const CaseTracking = () => {
   };
 
   const handleStatusChange = (caseId: string, newStatus: string) => {
-    setCases(cases.map(case_ => 
-      case_.id === caseId 
-        ? { ...case_, status: newStatus as Case['status'] }
-        : case_
-    ));
-    
+    updateCaseStatus(caseId, newStatus as Case['status']);
+
     toast({
       title: "Case Updated",
       description: `Case ${caseId} status changed to ${newStatus}.`,
       variant: "default",
     });
   };
+
+  function handleAddEvidence() {
+    if (!evidenceCase || !evidenceInput.trim()) return;
+    addEvidenceToCase(evidenceCase.id, evidenceInput);
+    toast({ title: 'Evidence added', description: `Evidence added to ${evidenceCase.id}.` });
+    setEvidenceCase(null);
+    setEvidenceInput('');
+  }
+
+  function generateReport(case_: Case) {
+    const data = {
+      ...case_,
+      generatedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${case_.id}-report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Report generated', description: `${case_.id} report downloaded.` });
+  }
 
   return (
     <div className="space-y-6">
@@ -198,7 +226,7 @@ export const CaseTracking = () => {
                   </div>
                   <p className="text-muted-foreground mb-3">{case_.description}</p>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => setDetailsCase(case_)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Details
                 </Button>
@@ -249,10 +277,10 @@ export const CaseTracking = () => {
                   <option value="investigating">Investigating</option>
                   <option value="closed">Closed</option>
                 </select>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => { setEvidenceCase(case_); setEvidenceInput(''); }}>
                   Add Evidence
                 </Button>
-                <Button variant="outline" size="sm">
+                <Button variant="outline" size="sm" onClick={() => generateReport(case_)}>
                   Generate Report
                 </Button>
               </div>
@@ -274,6 +302,70 @@ export const CaseTracking = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Details Dialog */}
+      <Dialog open={!!detailsCase} onOpenChange={(open) => !open && setDetailsCase(null)}>
+        <DialogContent>
+          {detailsCase && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Case {detailsCase.id} – {detailsCase.title}</DialogTitle>
+              </DialogHeader>
+              <p className="text-sm text-muted-foreground">{detailsCase.description}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Reported By</p>
+                  <p className="font-medium">{detailsCase.reportedBy}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Reported Date</p>
+                  <p className="font-medium">{detailsCase.reportedDate}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <p className="font-medium capitalize">{detailsCase.status}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Priority</p>
+                  <p className="font-medium capitalize">{detailsCase.priority}</p>
+                </div>
+              </div>
+              {detailsCase.evidence.length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Evidence</p>
+                  <div className="flex flex-wrap gap-2">
+                    {detailsCase.evidence.map((e, i) => (
+                      <Badge key={i} variant="outline" className="text-xs">{e}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Evidence Dialog */}
+      <Dialog open={!!evidenceCase} onOpenChange={(open) => !open && setEvidenceCase(null)}>
+        <DialogContent>
+          {evidenceCase && (
+            <div className="space-y-4">
+              <DialogHeader>
+                <DialogTitle>Add Evidence to {evidenceCase.id}</DialogTitle>
+              </DialogHeader>
+              <Input
+                placeholder="e.g. CCTV clip ID 12345"
+                value={evidenceInput}
+                onChange={(e) => setEvidenceInput(e.target.value)}
+              />
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEvidenceCase(null)}>Cancel</Button>
+                <Button onClick={() => handleAddEvidence()} disabled={!evidenceInput.trim()}>Add</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

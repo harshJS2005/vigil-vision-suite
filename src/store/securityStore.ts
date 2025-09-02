@@ -40,6 +40,7 @@ interface SecurityState {
   // Cases
   addCase: (input: NewCaseInput) => Case;
   updateCaseStatus: (id: string, status: Case['status']) => void;
+  addEvidenceToCase: (id: string, evidence: string) => void;
   // IP Blocking
   blockIP: (input: NewBlockedIPInput) => BlockedIP;
   unblockIP: (id: string) => void;
@@ -104,6 +105,13 @@ export const useSecurityStore = create<SecurityState>()(
       updateCaseStatus: (id, status) => {
         set((state) => ({
           cases: state.cases.map((c) => c.id === id ? { ...c, status } : c)
+        }));
+      },
+
+      addEvidenceToCase: (id, evidence) => {
+        if (!evidence.trim()) return;
+        set((state) => ({
+          cases: state.cases.map((c) => c.id === id ? { ...c, evidence: [...c.evidence, evidence.trim()] } : c)
         }));
       },
 
