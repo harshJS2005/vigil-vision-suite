@@ -128,6 +128,52 @@ export const NumberPlateRecognition = () => {
     }
   };
 
+  function normalizePlate(p: string) {
+    // collapse multiple spaces, unify dash spacing
+    return p.replace(/\s+/g, ' ').replace(/\s?-\s?/g, '-').trim();
+  }
+
+  async function generatePreprocessedVariants(src: string): Promise<string[]> {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    const load = () => new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = rej; });
+    img.src = src;
+    await load();
+    const variants: string[] = [];
+    const scales = [1, 1.5, 2];
+    const thresholds = [110, 140, 170];
+    for (const s of scales) {
+      const w = Math.floor(img.naturalWidth * s);
+      const h = Math.floor(img.naturalHeight * s);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) continue;
+      ctx.drawImage(img, 0, 0, w, h);
+      const imageData = ctx.getImageData(0, 0, w, h);
+      // grayscale
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i], g = imageData.data[i+1], b = imageData.data[i+2];
+        const y = 0.299*r + 0.587*g + 0.114*b;
+        imageData.data[i] = imageData.data[i+1] = imageData.data[i+2] = y;
+      }
+      // try several thresholds
+      for (const t of thresholds) {
+        const copy = new ImageData(new Uint8ClampedArray(imageData.data), imageData.width, imageData.height);
+        for (let i = 0; i < copy.data.length; i += 4) {
+          const v = copy.data[i];
+          const bin = v > t ? 255 : 0;
+          copy.data[i] = copy.data[i+1] = copy.data[i+2] = bin;
+        }
+        ctx.putImageData(copy, 0, 0);
+        variants.push(canvas.toDataURL('image/png'));
+      }
+    }
+    // include original as last resort
+    variants.push(src);
+    return variants;
+  }
+
   function extractPlateCandidates(text: string): string[] {
     const cleaned = text.replace(/[^A-Z0-9 -]/g, ' ');
     const patterns = [
