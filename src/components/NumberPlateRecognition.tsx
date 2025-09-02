@@ -149,6 +149,21 @@ export const NumberPlateRecognition = () => {
     processPlateRecognition(manualPlate.toUpperCase());
   };
 
+  function generatePlateReport() {
+    if (!plateResult) return;
+    const data = { ...plateResult, generatedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${plateResult.plateNumber}-plate-report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Report generated', description: `${plateResult.plateNumber} report downloaded.` });
+  }
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
