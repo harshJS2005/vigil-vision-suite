@@ -20,6 +20,7 @@ export const NumberPlateRecognition = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [plateResult, setPlateResult] = useState<PlateResult | null>(null);
   const [manualPlate, setManualPlate] = useState('');
+  const [ocrProgress, setOcrProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
