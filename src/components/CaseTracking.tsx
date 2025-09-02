@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Search, FileText, Clock, User, AlertCircle, CheckCircle, Eye } from 'lucide-react';
 import { useSecurityStore } from '@/store/securityStore';
 import { Case } from '@/types';
+import { mockCases } from '@/data/mockData';
 
 export const CaseTracking = () => {
   const [cases, setCases] = useState<Case[]>(mockCases);
