@@ -284,6 +284,15 @@ export const NumberPlateRecognition = () => {
               />
             </div>
 
+            {isProcessing && (
+              <div className="text-center text-sm text-muted-foreground">OCR Progress: {ocrProgress}%</div>
+            )}
+
+            <div className="flex items-center justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => { const d = createSamplePlate('ABC-123'); setUploadedImage(d); setPlateResult(null); }}>Load Sample ABC-123</Button>
+              <Button variant="outline" size="sm" onClick={() => { const d = createSamplePlate('MH-12-AB-1234'); setUploadedImage(d); setPlateResult(null); }}>Load Sample MH-12-AB-1234</Button>
+            </div>
+
             <Button
               variant="glow"
               className="w-full"
