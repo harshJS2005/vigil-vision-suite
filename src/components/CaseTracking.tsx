@@ -71,6 +71,31 @@ export const CaseTracking = () => {
     });
   };
 
+  function handleAddEvidence() {
+    if (!evidenceCase || !evidenceInput.trim()) return;
+    addEvidenceToCase(evidenceCase.id, evidenceInput);
+    toast({ title: 'Evidence added', description: `Evidence added to ${evidenceCase.id}.` });
+    setEvidenceCase(null);
+    setEvidenceInput('');
+  }
+
+  function generateReport(case_: Case) {
+    const data = {
+      ...case_,
+      generatedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${case_.id}-report.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Report generated', description: `${case_.id} report downloaded.` });
+  }
+
   return (
     <div className="space-y-6">
       {/* Header and Filters */}
