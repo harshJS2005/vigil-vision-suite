@@ -17,6 +17,10 @@ const Dashboard = () => {
   const [liveOpen, setLiveOpen] = useState(false);
   const [events, setEvents] = useState<{ id: number; type: string; message: string; ts: string }[]>([]);
 
+  const storeCriminals = useSecurityStore((s) => s.criminals);
+  const storeCases = useSecurityStore((s) => s.cases);
+  const storeIPs = useSecurityStore((s) => s.blockedIPs);
+
   useEffect(() => {
     if (!liveOpen) return;
     let id = 0;
@@ -37,9 +41,9 @@ const Dashboard = () => {
   }, [liveOpen]);
 
   const stats = {
-    totalCriminals: mockCriminals.length,
-    activeCases: mockCases.filter(c => c.status !== 'closed').length,
-    blockedIPs: mockBlockedIPs.filter(ip => ip.status === 'active').length,
+    totalCriminals: storeCriminals.length,
+    activeCases: storeCases.filter(c => c.status !== 'closed').length,
+    blockedIPs: storeIPs.filter(ip => ip.status === 'active').length,
     recognitionMatches: 47
   };
 
